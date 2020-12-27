@@ -9,17 +9,17 @@ local baDebug                     = false  -- BA debug messages
 -- Chat Parameters
 local delayBetweenMessagesPerChar = 2   -- This delay is per character
 local maxMessagesSent             = 4   -- Max messages that can be send at once before getting muted by the server
-local gracePeriodForSendMessages  = 1   -- Assuming that we can send at most 'maxMessagesSent' every 'gracePeriodForSendMessages' seconds
+local gracePeriodForSendMessages  = 1.2   -- Assuming that we can send at most 'maxMessagesSent' every 'gracePeriodForSendMessages' seconds
 
 -- General spells
 local ENERVATING_BRAND_ID = 74505
 
-local validChannels        = {"SAY", "YELL", "RAID", "PARTY"}
-local validInstances       = {"The Ruby Sanctum"}
-local sentChatMessageTime  = 0     -- Last time any chatMessage has been sent
-local alertedPlayerTime    = {}
-local stacksPerPlayer      = {}
-local messagesSent         = {}
+local validChannels       = {"SAY", "YELL", "RAID", "PARTY"}
+local validInstances      = {"The Ruby Sanctum"}
+local sentChatMessageTime = 0     -- Last time any chatMessage has been sent
+local alertedPlayerTime   = {}
+local stacksPerPlayer     = {}
+local timeMessagesSent    = {}
 local queuedMessages
 
 -- Player current instance info
@@ -123,10 +123,11 @@ local function isSendMessageGoingToMute()
    local time
    local count = 0
 
-   for _, string in pairs(messagesSent) do
-      time = strsplit("\t", string)
+   for index, time in pairs(timeMessagesSent) do
       if (now <= (tonumber(time) + gracePeriodForSendMessages)) then
          count = count + 1
+      else
+         table.remove(timeMessagesSent,index)
       end
    end
    if count >= maxMessagesSent then return true
@@ -134,11 +135,11 @@ local function isSendMessageGoingToMute()
 end
 
 -- Frame update handler
-local function onUpdate(this, arg1)
+local function onUpdate(this)
    if not BA.db.enabled then return end
    if not queuedMessages then
       if baDebug then send("unregistered onUpdate because there are no messages") end
-      BA:SetScript("OnUpdate", nil)
+      this:SetScript("OnUpdate", nil)
       return
    end
    if isSendMessageGoingToMute() then return end
@@ -148,9 +149,9 @@ local function onUpdate(this, arg1)
 
    sentChatMessageTime = now
    alertedPlayerTime[srcName] = now
-   table.insert(messagesSent, format("%s\t%s",now,srcName))
-   say(message, channelToSendMessage)
+   table.insert(timeMessagesSent, now)
 
+   say(message, channelToSendMessage)
    table.remove(queuedMessages,1)
    if getTableLength(queuedMessages)==0 then queuedMessages = nil end
 end
@@ -237,7 +238,7 @@ local function zeroVariables()
    alertedPlayerTime   = {}
    stacksPerPlayer     = {}
    sentChatMessageTime = 0
-   messagesSent        = {}
+   timeMessagesSent    = {}
    queuedMessages      = nil
 end
 
