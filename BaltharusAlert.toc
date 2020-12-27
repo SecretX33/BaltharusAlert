@@ -1,0 +1,12 @@
+# You can find updates in https://github.com/SecretX33/AutomaticWeaponRemoval
+#
+## Interface: 30300
+## Title: BaltharusAlert
+## Notes: Alert when the marked player don't spread.
+## Author: SecretX (Freezingice @ WoW-Brasil)
+## Version: 1.0
+## SavedVariables: BADB
+## OptionalDeps: BugSack, !Swatter
+## X-Category: Combat Assist
+
+BaltharusAlert.lua
