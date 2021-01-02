@@ -51,25 +51,30 @@ end
 -- [string utils]
 -- Remove spaces on start and end of string
 local function trim(s)
+   if s==nil then return "" end
+   assert(type(s) == "string", "bad argument #1: 's' needs to be a string; instead what came was " .. tostring(type(s)))
    return string.match(s,'^()%s*$') and '' or string.match(s,'^%s*(.*%S)')
 end
 
-local function removeWords(myString, numberOfWords)
-   if (myString~=nil and numberOfWords~=nil) then
-      if is_int(numberOfWords) then
-         for i=1, numberOfWords do
-            myString = string.gsub(myString,"^(%s*%a+)","",1)
-         end
-         return trim(myString)
-      else send("numberOfWords arg came, it's not nil BUT it's also NOT an integer, report this, type = " .. tostring(type(numberOfWords))) end
+local function removeWords(myString, howMany)
+   if (myString~=nil and howMany~=nil) then
+      assert(type(myString) == "string", "bad argument #1: 'myString' needs to be a string; instead what came was " .. tostring(type(myString)))
+      assert(type(howMany) == "number", "bad argument #2: 'howMany' needs to be a number; instead what came was " .. tostring(type(howMany)))
+      assert(math.floor(howMany) == howMany, "bad argument #2: 'howMany' needs to be an integer")
+
+      for i=1, howMany do
+         myString = string.gsub(myString,"^(%s*%a+)","",1)
+      end
+      return trim(myString)
    end
    return ""
 end
 -- end of [string utils]
 
 local function tableHasThisEntry(table, entry)
-   if table==nil then send("table came nil inside function that check if table has a value, report this");return; end
-   if entry==nil then send("entry came nil inside function to check if table has a value, report this");return; end
+   assert(table~=nil, "bad argument #1: 'table' cannot be nil")
+   assert(type(table) == "table", "bad argument #1: 'table' needs to be a table; instead what came was " .. tostring(type(table)))
+   assert(entry~=nil, "bad argument #2: 'entry' cannot be nil")
 
    for _, value in ipairs(table) do
       if value == entry then
@@ -80,8 +85,9 @@ local function tableHasThisEntry(table, entry)
 end
 
 local function tableHasThisKey(table, keyToSearch)
-   if table==nil then send("table came nil inside function that check if table has a key, report this");return; end
-   if keyToSearch==nil then send("keyToSearch came nil inside function to check if table has a key, report this");return; end
+   assert(table~=nil, "bad argument #1: 'table' cannot be nil")
+   assert(type(table) == "table", "bad argument #1: 'table' needs to be a table; instead what came was " .. tostring(type(table)))
+   assert(keyToSearch~=nil, "bad argument #2: 'keyToSearch' cannot be nil")
 
    for key,_ in pairs(table) do
       if key == keyToSearch then
@@ -92,6 +98,9 @@ local function tableHasThisKey(table, keyToSearch)
 end
 
 local function getTableLength(table)
+   assert(table~=nil, "bad argument #1: 'table' cannot be nil")
+   assert(type(table) == "table", "bad argument #1: 'table' needs to be a table; instead what came was " .. tostring(type(table)))
+
    local count = 0
    for _ in pairs(table) do count = count + 1 end
    return count
@@ -159,6 +168,7 @@ end
 -- Logic functions are under here
 local function alertPlayer(srcName)
    if srcName==nil or srcName=="" then return end
+   assert(type(srcName) == "string", "bad argument #1: 'srcName' needs to be a string; instead what came was " .. tostring(type(srcName)))
 
    local now = GetTime()
    stacksPerPlayer[srcName] = stacksPerPlayer[srcName] and (stacksPerPlayer[srcName] + 1) or 1
@@ -355,7 +365,7 @@ function BA:ADDON_LOADED(addon)
    baDebug = self.db.debug or baDebug
    channelToSendMessage = self.db.channeltosendmessage or channelToSendMessage
    SLASH_BALTHARUSALERT1 = "/ba"
-   SLASH_BALTHARUSALERTL2 = "/baltharusalert"
+   SLASH_BALTHARUSALERT2 = "/baltharusalert"
    SlashCmdList.BALTHARUSALERT = function(cmd) slashCommand(cmd) end
    if baDebug then send("remember that debug mode is |cff00ff00ON|r.") end
 
