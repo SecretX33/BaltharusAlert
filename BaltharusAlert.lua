@@ -7,9 +7,9 @@ local channelToSendMessage = "RAID"   -- valid options are SAY, YELL, RAID, PART
 -- Don't touch anything below
 local baDebug                     = false  -- BA debug messages
 -- Chat Parameters
-local delayBetweenMessagesPerChar = 2   -- This delay is per character
-local maxMessagesSent             = 4   -- Max messages that can be send at once before getting muted by the server
-local gracePeriodForSendMessages  = 1.2   -- Assuming that we can send at most 'maxMessagesSent' every 'gracePeriodForSendMessages' seconds
+local delayBetweenMessagesPerChar = 2    -- This delay is per character
+local maxMessagesSent             = 3    -- Max messages that can be send at once before getting muted by the server
+local gracePeriodForSendMessages  = 1.2  -- Assuming that we can send at most 'maxMessagesSent' every 'gracePeriodForSendMessages' seconds
 
 -- General spells
 local ENERVATING_BRAND_ID = 74505
@@ -20,7 +20,6 @@ local sentChatMessageTime = 0     -- Last time any chatMessage has been sent
 local alertedPlayerTime   = {}
 local stacksPerPlayer     = {}
 local timeMessagesSent    = {}
-local queuedMessages
 
 -- Player current instance info
 local instanceName
@@ -29,7 +28,7 @@ local addonPrefix = "|cfff02236BaltharusAlert:|r "
 local addonVersion
 
 -- Upvalues
-local SendChatMessage, GetTime, UnitName, format = SendChatMessage, GetTime, UnitName, string.format
+local SendChatMessage, GetTime, UnitName, strsplit, wipe, format = SendChatMessage, GetTime, UnitName, strsplit, wipe, string.format
 
 BA:SetScript("OnEvent", function(self, event, ...)
    self[event](self, ...)
@@ -126,43 +125,77 @@ local function updatePlayerLocalIfNeeded()
    if(instanceName==nil) then updatePlayerLocal() end
 end
 
--- Addon is going to check how many messages got sent in the last 'gracePeriodForSendMessages', and if its equal or maxMessageSent then this function will return true, indicating that player cannot send more messages for now
-local function isSendMessageGoingToMute()
-   local now = GetTime()
-   local time
-   local count = 0
+do
+   local Messenger = CreateFrame("frame")
+   local queuedMessages = {}
 
-   for index, time in pairs(timeMessagesSent) do
-      if (now <= (tonumber(time) + gracePeriodForSendMessages)) then
-         count = count + 1
-      else
-         table.remove(timeMessagesSent,index)
+   -- Addon is going to check how many messages got sent in the last 'gracePeriodForSendMessages', and if its equal or maxMessageSent then this function will return true, indicating that player cannot send more messages for now
+   local function isSendMessageGoingToMute()
+      local now = GetTime()
+      local count = 0
+
+      for index, time in pairs(timeMessagesSent) do
+         if (now <= (tonumber(time) + gracePeriodForSendMessages)) then
+            count = count + 1
+         else
+            table.remove(timeMessagesSent,index)
+         end
+      end
+      return count >= maxMessagesSent
+   end
+
+   -- Frame update handler
+   local function onUpdate(this)
+      if not BA.db.enabled then return end
+      if #queuedMessages == 0 then
+         if baDebug then send("unregistered onUpdate because there are no messages") end
+         this:SetScript("OnUpdate", nil)
+         return
+      end
+      if isSendMessageGoingToMute() then return end
+
+      local now = GetTime()
+      local message, srcName = strsplit("\t",queuedMessages[1])
+
+      sentChatMessageTime = now
+      alertedPlayerTime[srcName] = now
+      table.insert(timeMessagesSent, now)
+
+      say(message, channelToSendMessage)
+      table.remove(queuedMessages,1)
+   end
+
+   function BA:QueueMsg(msg)
+      if(msg~=nil) then
+         queuedMessages = queuedMessages or {}
+         table.insert(queuedMessages,msg)
+         Messenger:SetScript("OnUpdate", onUpdate)
       end
    end
-   if count >= maxMessagesSent then return true
-   else return false end
-end
 
--- Frame update handler
-local function onUpdate(this)
-   if not BA.db.enabled then return end
-   if not queuedMessages then
-      if baDebug then send("unregistered onUpdate because there are no messages") end
-      this:SetScript("OnUpdate", nil)
-      return
+   function BA:CHAT_MSG_WHISPER(_, srcName)
+      if srcName == UnitName("player") then table.insert(timeMessagesSent, GetTime()) end
    end
-   if isSendMessageGoingToMute() then return end
 
-   local now = GetTime()
-   local message, srcName = strsplit("\t",queuedMessages[1])
+   function BA:CHAT_MSG_SAY(_, srcName)
+      if srcName == UnitName("player") then table.insert(timeMessagesSent, GetTime()) end
+   end
 
-   sentChatMessageTime = now
-   alertedPlayerTime[srcName] = now
-   table.insert(timeMessagesSent, now)
+   function BA:CHAT_MSG_PARTY(_, srcName)
+      if srcName == UnitName("player") then table.insert(timeMessagesSent, GetTime()) end
+   end
 
-   say(message, channelToSendMessage)
-   table.remove(queuedMessages,1)
-   if getTableLength(queuedMessages)==0 then queuedMessages = nil end
+   function BA:CHAT_MSG_RAID(_, srcName)
+      if srcName == UnitName("player") then table.insert(timeMessagesSent, GetTime()) end
+   end
+
+   function BA:CHAT_MSG_RAID_LEADER(_, srcName)
+      if srcName == UnitName("player") then table.insert(timeMessagesSent, GetTime()) end
+   end
+
+   function BA:CHAT_MSG_RAID_WARNING(_, srcName)
+      if srcName == UnitName("player") then table.insert(timeMessagesSent, GetTime()) end
+   end
 end
 
 -- Logic functions are under here
@@ -176,20 +209,9 @@ local function alertPlayer(srcName)
 
    local message = format(chatMessage,srcName,stacksPerPlayer[srcName],((stacksPerPlayer[srcName] > 1) and plural or ""))
    if not tableHasThisKey(alertedPlayerTime, srcName) then alertedPlayerTime[srcName] = 0 end
-   --if not queuedMessages and not isSendMessageGoingToMute() and (now > (alertedPlayerTime[srcName] + delayBetweenMessagesPerChar)) then
-   --   sentChatMessageTime        = now
-   --   alertedPlayerTime[srcName] = now
-   --   table.insert(messagesSent, format("%s\t%s",now,srcName))
-   --   say(message, channelToSendMessage)
-   --elseif isSendMessageGoingToMute() and not (now > (alertedPlayerTime[srcName] + delayBetweenMessagesPerChar)) then
-   --   queuedMessages = queuedMessages or {}
-   --   table.insert(queuedMessages,format("%s\t%s",message,srcName))
-   --   BA:SetScript("OnUpdate", onUpdate)
-   --end
+
    if not (now > (alertedPlayerTime[srcName] + delayBetweenMessagesPerChar)) then
-      queuedMessages = queuedMessages or {}
-      table.insert(queuedMessages,format("%s\t%s",message,srcName))
-      BA:SetScript("OnUpdate", onUpdate)
+      BA:QueueMsg(format("%s\t%s",message,srcName))
    end
 end
 
@@ -202,22 +224,44 @@ function BA:COMBAT_LOG_EVENT_UNFILTERED(_, event, _, srcName, _, _, destName, _,
    end
 end
 
+local function zeroVariables()
+   sentChatMessageTime = 0
+   wipe(alertedPlayerTime)
+   wipe(stacksPerPlayer)
+   wipe(timeMessagesSent)
+end
+
 local function regForAllEvents()
    if(BA==nil) then send("frame is nil inside function that register for all events function, report this"); return; end
    if baDebug then send("addon is now listening to all combatlog events.") end
 
-   BA:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-   BA:RegisterEvent("PLAYER_REGEN_ENABLED")
-   BA:RegisterEvent("PLAYER_REGEN_DISABLED")
+   BA:RegisterEvents(
+      "COMBAT_LOG_EVENT_UNFILTERED",
+      "PLAYER_REGEN_DISABLED",
+      "CHAT_MSG_WHISPER",
+      "CHAT_MSG_SAY",
+      "CHAT_MSG_PARTY",
+      "CHAT_MSG_RAID",
+      "CHAT_MSG_RAID_LEADER",
+      "CHAT_MSG_RAID_WARNING"
+   )
 end
 
 local function unregFromAllEvents()
    if(BA==nil) then send("frame is nil inside function that unregister all events function, report this"); return; end
    if baDebug then send("addon is no longer listening to combatlog events.") end
 
-   BA:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-   BA:UnregisterEvent("PLAYER_REGEN_ENABLED")
-   BA:UnregisterEvent("PLAYER_REGEN_DISABLED")
+   BA:UnregisterEvents(
+      "COMBAT_LOG_EVENT_UNFILTERED",
+      "PLAYER_REGEN_DISABLED",
+      "CHAT_MSG_WHISPER",
+      "CHAT_MSG_SAY",
+      "CHAT_MSG_PARTY",
+      "CHAT_MSG_RAID",
+      "CHAT_MSG_RAID_LEADER",
+      "CHAT_MSG_RAID_WARNING"
+   )
+   zeroVariables()
 end
 
 -- Checks if addon should be enabled, and enable it if isn't enabled, and disable if it should not be enabled
@@ -244,26 +288,13 @@ local function checkIfAddonShouldBeEnabled()
    return shouldIt, reason
 end
 
-local function zeroVariables()
-   alertedPlayerTime   = {}
-   stacksPerPlayer     = {}
-   sentChatMessageTime = 0
-   timeMessagesSent    = {}
-   queuedMessages      = nil
+function BA:PLAYER_REGEN_DISABLED()
+   zeroVariables()
 end
 
 function BA:PLAYER_ENTERING_WORLD()
    updatePlayerLocal()
    checkIfAddonShouldBeEnabled()
-   zeroVariables()
-end
-
-function BA:PLAYER_REGEN_ENABLED()
-   zeroVariables()
-end
-
-function BA:PLAYER_REGEN_DISABLED()
-   zeroVariables()
 end
 
 -- Slash commands functions
@@ -330,11 +361,9 @@ local function slashChannel(channel)
 end
 
 local function slashTest()
-   queuedMessages = queuedMessages or {}
    for i=1,20 do
-      table.insert(queuedMessages,format("%s\t%s","It's a test " .. i,"Freezer"))
+      BA:QueueMsg(format("%s\t%s","It's a test " .. i,"Freezer"))
    end
-   BA:SetScript("OnUpdate", onUpdate)
 end
 
 local function slashCommand(typed)
@@ -353,6 +382,20 @@ local function slashCommand(typed)
    end
 end
 -- End of slash commands function
+
+function BA:RegisterEvents(...)
+   for i = 1, select("#", ...) do
+      local ev = select(i, ...)
+      self:RegisterEvent(ev)
+   end
+end
+
+function BA:UnregisterEvents(...)
+   for i = 1, select("#", ...) do
+      local ev = select(i, ...)
+      self:UnregisterEvent(ev)
+   end
+end
 
 function BA:ADDON_LOADED(addon)
    if addon ~= "BaltharusAlert" then return end
