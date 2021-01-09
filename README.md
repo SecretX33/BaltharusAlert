@@ -1,19 +1,14 @@
 # AutomaticWeaponRemoval
 
-* [Summary](#summary)
-* [FAQ](#faq)
+This addon is made for World of Warcraft 3.3.5a
+
+It will alert on chat if somebody of your raid stacks more than 2 stacks on other players of Baltharus's Debuff.
 
 ## Download
 
 You can download the lastest version by [clicking here](https://github.com/SecretX33/AutomaticWeaponRemoval/releases/latest/download/AutomaticWeaponRemoval.zip). 
 
-OR if you want to download an earlier version of the addon, you can do it by checking the release page [here](https://github.com/SecretX33/AutomaticWeaponRemoval/releases).
-
-## Summary
-
-This addon is made for World of Warcraft 3.3.5a
-
-It will alert on chat if somebody of your raid stacks more than 2 stacks on other players of Baltharus's Debuff.
+Or if you want to download an earlier version of the addon, you can do it by checking the release page [here](https://github.com/SecretX33/AutomaticWeaponRemoval/releases).
 
 ## Reporting issues
 
